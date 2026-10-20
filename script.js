@@ -18,28 +18,36 @@ let currentLevel = 1;
 let audioContext, analyser, dataArray;
 
 function initAudio() {
-    navigator.mediaDevices.getUserMedia({ audio: true, video: false })
-        .then(stream => {
-            audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            const source = audioContext.createMediaStreamSource(stream);
-            analyser = audioContext.createAnalyser();
-            
-            // Setting up frequency limits
-            analyser.fftSize = 512;
-            source.connect(analyser);
-            
-            const bufferLength = analyser.frequencyBinCount;
-            dataArray = new Uint8Array(bufferLength);
-            
-            document.getElementById('start-screen').style.display = 'none';
-            gameActive = true;
-            gameLoop();
-            spawnObstacleLoop();
-        })
-        .catch(err => {
-            alert("Microphone access is required for this game to work!");
-            console.log(err);
-        });
+    navigator.mediaDevices.getUserMedia({ 
+        audio: {
+            // Turn off browser auto-gain and processing so it doesn't accidentally amplify background room noise
+            echoCancellation: false,
+            noiseSuppression: true, 
+            autoGainControl: false
+        }, 
+        video: false 
+    })
+    .then(stream => {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const source = audioContext.createMediaStreamSource(stream);
+        analyser = audioContext.createAnalyser();
+        
+        analyser.fftSize = 512;
+        analyser.smoothingTimeConstant = 0.2; // Faster reaction time to short clucks
+        source.connect(analyser);
+        
+        const bufferLength = analyser.frequencyBinCount;
+        dataArray = new Uint8Array(bufferLength);
+        
+        document.getElementById('start-screen').style.display = 'none';
+        gameActive = true;
+        gameLoop();
+        spawnObstacleLoop();
+    })
+    .catch(err => {
+        alert("Microphone access is required for this game to work!");
+        console.log(err);
+    });
 }
 
 function gameLoop() {
@@ -47,25 +55,40 @@ function gameLoop() {
 
     analyser.getByteFrequencyData(dataArray);
     
-    // "BOK" Filter Logic: Focus heavily on mid-to-high vocal pitch bins (Indices 10 to 45)
-    // This ignores deep desk thumps or high mouse click clicks.
+    // 1. Isolate the specific sharp pitch range of a "BOK" sound
     let bokFrequencySum = 0;
     let count = 0;
-    for (let i = 10; i < 45; i++) {
+    for (let i = 12; i < 40; i++) { 
         bokFrequencySum += dataArray[i];
         count++;
     }
     let bokVolume = bokFrequencySum / count;
     
-    // Render visual mic meter based on the filtered sound
-    let micPercentage = Math.min(100, (bokVolume / 90) * 100);
-    micBar.style.width = micPercentage + "%";
+    // 2. STRICTOR ACTIVATION THRESHOLD
+    // '55' is high enough to block normal classroom chatter, typing, and ambient shuffling.
+    // It requires a direct, sharp sound close to the mic.
+    const strictThreshold = 55; 
 
-    // Jump trigger (Adjust '35' higher if it jumps randomly, lower if you have to scream)
-    if (bokVolume > 35 && chickenY === 0) {
-        let jumpPower = Math.min(18, bokVolume * 0.28);
+    // Render visual meter relative to our strict threshold
+    let displayPercentage = 0;
+    if (bokVolume > 15) {
+        displayPercentage = Math.min(100, ((bokVolume - 15) / (strictThreshold - 15)) * 100);
+    }
+    micBar.style.width = displayPercentage + "%";
+    
+    // Visual indicator: Bar turns green when you are loud enough to jump
+    if (bokVolume > strictThreshold) {
+        micBar.style.background = "#ff007f"; 
+    } else {
+        micBar.style.background = "#00ffcc";
+    }
+
+    // 3. Jump Execution
+    if (bokVolume > strictThreshold && chickenY === 0) {
+        // Linear scale for jump calculation so screaming doesn't break physics
+        let jumpPower = Math.min(19, 10 + (bokVolume - strictThreshold) * 0.2);
         velocityY = jumpPower;
-        chicken.classList.add("jumping"); // Wing animation
+        chicken.classList.add("jumping");
     }
 
     // Apply Physics Gravity
@@ -86,12 +109,10 @@ function gameLoop() {
         currentLeft -= obstacleSpeed;
         obs.element.style.left = currentLeft + 'px';
 
-        // Collision Check (Slightly narrower hitbox to be fair)
         if (currentLeft < 140 && currentLeft > 95 && chickenY < obs.height) {
             endGame();
         }
 
-        // Delete past obstacles & boost points
         if (currentLeft < -40) {
             obs.element.remove();
             obstacles.splice(i, 1);
@@ -130,7 +151,7 @@ function spawnObstacleLoop() {
 
 function endGame() {
     gameActive = false;
-    gameOverScreen.style.display = 'flex'; // TYPO FIXED HERE
+    gameOverScreen.style.display = 'flex';
     finalScore.innerText = score;
 }
 
@@ -144,7 +165,7 @@ function resetGame() {
     velocityY = 0;
     scoreDisplay.innerText = score;
     levelDisplay.innerText = "1 (Infinite Mode)";
-    gameOverScreen.style.display = 'none'; // TYPO FIXED HERE
+    gameOverScreen.style.display = 'none';
     gameActive = true;
     gameLoop();
     spawnObstacleLoop();
