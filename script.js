@@ -23,7 +23,9 @@ function initAudio() {
             audioContext = new (window.AudioContext || window.webkitAudioContext)();
             const source = audioContext.createMediaStreamSource(stream);
             analyser = audioContext.createAnalyser();
-            analyser.fftSize = 256;
+            
+            // Setting up frequency limits
+            analyser.fftSize = 512;
             source.connect(analyser);
             
             const bufferLength = analyser.frequencyBinCount;
@@ -44,41 +46,52 @@ function gameLoop() {
     if (!gameActive) return;
 
     analyser.getByteFrequencyData(dataArray);
-    let sum = 0;
-    for (let i = 0; i < dataArray.length; i++) {
-        sum += dataArray[i];
-    }
-    let averageVolume = sum / dataArray.length;
     
-    let micPercentage = Math.min(100, (averageVolume / 80) * 100);
+    // "BOK" Filter Logic: Focus heavily on mid-to-high vocal pitch bins (Indices 10 to 45)
+    // This ignores deep desk thumps or high mouse click clicks.
+    let bokFrequencySum = 0;
+    let count = 0;
+    for (let i = 10; i < 45; i++) {
+        bokFrequencySum += dataArray[i];
+        count++;
+    }
+    let bokVolume = bokFrequencySum / count;
+    
+    // Render visual mic meter based on the filtered sound
+    let micPercentage = Math.min(100, (bokVolume / 90) * 100);
     micBar.style.width = micPercentage + "%";
 
-    if (averageVolume > 25 && chickenY === 0) {
-        let jumpPower = Math.min(18, averageVolume * 0.25);
+    // Jump trigger (Adjust '35' higher if it jumps randomly, lower if you have to scream)
+    if (bokVolume > 35 && chickenY === 0) {
+        let jumpPower = Math.min(18, bokVolume * 0.28);
         velocityY = jumpPower;
-        chicken.innerText = "🚀";
+        chicken.classList.add("jumping"); // Wing animation
     }
 
+    // Apply Physics Gravity
     chickenY += velocityY;
     velocityY -= gravity;
 
     if (chickenY <= 0) {
         chickenY = 0;
         velocityY = 0;
-        chicken.innerText = "🐔";
+        chicken.classList.remove("jumping");
     }
     chicken.style.bottom = chickenY + 'px';
 
+    // Move Obstacles
     for (let i = obstacles.length - 1; i >= 0; i--) {
         let obs = obstacles[i];
         let currentLeft = parseInt(obs.element.style.left);
         currentLeft -= obstacleSpeed;
         obs.element.style.left = currentLeft + 'px';
 
-        if (currentLeft < 150 && currentLeft > 100 && chickenY < obs.height) {
+        // Collision Check (Slightly narrower hitbox to be fair)
+        if (currentLeft < 140 && currentLeft > 95 && chickenY < obs.height) {
             endGame();
         }
 
+        // Delete past obstacles & boost points
         if (currentLeft < -40) {
             obs.element.remove();
             obstacles.splice(i, 1);
@@ -117,7 +130,7 @@ function spawnObstacleLoop() {
 
 function endGame() {
     gameActive = false;
-    gameOverScreen.style.style.display = 'flex';
+    gameOverScreen.style.display = 'flex'; // TYPO FIXED HERE
     finalScore.innerText = score;
 }
 
@@ -131,7 +144,7 @@ function resetGame() {
     velocityY = 0;
     scoreDisplay.innerText = score;
     levelDisplay.innerText = "1 (Infinite Mode)";
-    gameOverScreen.style.style.display = 'none';
+    gameOverScreen.style.display = 'none'; // TYPO FIXED HERE
     gameActive = true;
     gameLoop();
     spawnObstacleLoop();
