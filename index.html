@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cluck Out Loud! 🐔</title>
+    <!-- This links your CSS file -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div id="ui">
+        <div>Score: <span id="score">0</span></div>
+        <div>Level: <span id="level-display">1 (Infinite Mode)</span></div>
+        <div style="display: flex; align-items: center; gap: 10px;">
+            🎤 Mic: 
+            <div id="mic-bar-container"><div id="mic-bar"></div></div>
+        </div>
+    </div>
+
+    <div id="game-container">
+        <div id="start-screen">
+            <h1>🐔 CLUCK OUT LOUD!</h1>
+            <p style="margin-bottom: 20px; text-align: center;">Make NOISE to make the chicken jump.<br>Loud sounds = Massive jumps!</p>
+            <button onclick="initAudio()">Enable Mic & Start</button>
+        </div>
+
+        <div id="game-over-screen">
+            <h1 style="color: #ff007f;">💥 GAME OVER</h1>
+            <p style="font-size: 24px; margin-bottom: 20px;">You traveled <span id="final-score">0</span> meters!</p>
+            <button onclick="resetGame()">Try Again</button>
+        </div>
+
+        <div id="chicken">🐔</div>
+    </div>
+
+    <!-- This links your JavaScript file -->
+    <script src="script.js"></script>
+</body>
+</html>
